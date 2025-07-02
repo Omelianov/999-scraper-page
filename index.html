@@ -1,29 +1,110 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Анализ предложений 999.md</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 40px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { cursor: pointer; background: #f0f0f0; }
-    tr:nth-child(even) { background: #f9f9f9; }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>999.md Анализ предложений</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { cursor: pointer; background: #f0f0f0; }
+        th.sort-asc::after { content: " ▲"; }
+        th.sort-desc::after { content: " ▼"; }
+        #filter { margin-top: 10px; }
+    </style>
 </head>
 <body>
-  <h1>Анализ предложений 999.md</h1>
-  <table id="offersTable">
-    <thead>
-      <tr>
-        <th onclick="sortTable(0)">Заголовок</th>
-        <th onclick="sortTable(1)">Цена</th>
-        <th onclick="sortTable(2)">Район</th>
-        <th>Ссылка</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <script src="script.js"></script>
+    <h1>Анализ предложений 999.md</h1>
+    <label for="districtFilter">Фильтр по району: </label>
+    <input type="text" id="districtFilter" placeholder="Введите район для фильтрации" />
+
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th data-key="title">Заголовок</th>
+                <th data-key="pricePerM2">Цена за м²</th>
+                <th data-key="price">Цена</th>
+                <th data-key="location">Район</th>
+                <th>Ссылка</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        async function loadData() {
+            try {
+                const response = await fetch('data.json');
+                let data = await response.json();
+
+                data = data.map(item => {
+                    const match = item.title.match(/(\d+(?:[.,]\d+)*)\s*(?:м2|m²|м²)/i);
+                    const area = match ? parseFloat(match[1].replace(',', '.')) : null;
+                    const priceClean = parseFloat(item.price.replace(/[^\d]/g, ''));
+                    const pricePerM2 = area ? (priceClean / area).toFixed(2) : 'N/A';
+                    return { ...item, area, priceClean, pricePerM2 };
+                });
+
+                const tbody = document.querySelector('#data-table tbody');
+
+                function renderTable(filter = '') {
+                    tbody.innerHTML = '';
+                    data.filter(item => item.location.toLowerCase().includes(filter.toLowerCase())).forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.title}</td>
+                            <td>${item.pricePerM2}</td>
+                            <td>${item.price}</td>
+                            <td>${item.location}</td>
+                            <td><a href="${item.link}" target="_blank">Перейти</a></td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+
+                document.getElementById('districtFilter').addEventListener('input', (e) => {
+                    renderTable(e.target.value);
+                });
+
+                renderTable();
+
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+            }
+        }
+
+        function sortTable(key) {
+            const table = document.querySelector('#data-table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const th = table.querySelector(`th[data-key="${key}"]`);
+            const currentSort = th.classList.contains('sort-asc') ? 'asc' : th.classList.contains('sort-desc') ? 'desc' : null;
+
+            document.querySelectorAll('th').forEach(th => th.classList.remove('sort-asc', 'sort-desc'));
+
+            const newSort = currentSort === 'asc' ? 'desc' : 'asc';
+            th.classList.add(newSort === 'asc' ? 'sort-asc' : 'sort-desc');
+
+            rows.sort((a, b) => {
+                const cellA = a.querySelector(`td:nth-child(${th.cellIndex + 1})`).innerText.replace(/[^\d\.]/g, '');
+                const cellB = b.querySelector(`td:nth-child(${th.cellIndex + 1})`).innerText.replace(/[^\d\.]/g, '');
+
+                if (!isNaN(cellA) && !isNaN(cellB) && cellA && cellB) {
+                    return newSort === 'asc' ? cellA - cellB : cellB - cellA;
+                } else {
+                    return newSort === 'asc' ? a.cells[th.cellIndex].innerText.localeCompare(b.cells[th.cellIndex].innerText) : b.cells[th.cellIndex].innerText.localeCompare(a.cells[th.cellIndex].innerText);
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        document.querySelectorAll('th[data-key]').forEach(th => {
+            th.addEventListener('click', () => sortTable(th.dataset.key));
+        });
+
+        loadData();
+    </script>
 </body>
 </html>
